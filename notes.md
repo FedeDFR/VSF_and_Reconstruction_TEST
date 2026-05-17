@@ -105,7 +105,8 @@ Linea 107
 CatalogueChainMesh (
     std::vector<catalogue::Var> variables,
     double cellsize,
-    std::shared_ptr<cbl::catalogue::Catalogue> cat, std::shared_ptr<cbl::catalogue::Catalogue> cat2)
+    std::shared_ptr<cbl::catalogue::Catalogue> cat,
+    std::shared_ptr<cbl::catalogue::Catalogue> cat2)
 ```
 
 ChainMesh esta definido en CatalogueChainMesh.cpp desdey este toma 4 parametros.
