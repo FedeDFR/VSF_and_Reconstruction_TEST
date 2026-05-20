@@ -246,6 +246,40 @@ La distancia se calculca reconstruyendo cada componente de la cordenada a partir
 
 ![Distancia euclidea](Imagenes/Distancia_euclidea.png)
 
-## Funcion N_nearest_objects
+## Funcion N_nearest_objects(obj, N)
 
+Esta funcion busca las N particulas mas cercanas a la particula obj. Como estamos analizando el caso de uso en LaZeVo N = 3*3*4*pi.
 
+### Algoritmo
+
+1. Define la posicion de la particula y calcula el indice de celda `center_index` en el que se encuentra la particula obj.
+
+2. Declara en `nCells` el vector que contiene a que distancia esta cada celda de la otra.
+
+```c++
+vector<vector<unsigned int>> nCells = nearCells(center_index);
+```
+
+3. Entra al while y va a salir hasta tener N objetos.
+
+    1. Actualiza a todas las particulas que no entraban en la anterior capa.
+
+    2. Va observando todos los objetos de las celdas de `nCells`, calcula su distancia y guarda si esta dentro del radio.
+
+      ```c++
+      for(unsigned int j : nCells[index]) {
+        for (unsigned int k : part(j)) {
+          new_distance = Euclidean_distance(pos[0], m_part_catalogue->xx(k), pos[1],  m_part_catalogue->yy(k), pos[2],  m_part_catalogue->zz(k));
+          temp_Object.push_back(k);
+          temp_distance_obj.push_back(new_distance);
+          if(new_distance < radius*(index+1)) mask.emplace_back(true);
+          else mask.emplace_back(false);
+        }
+      }
+      ```
+
+    3. Si llego a ver todos los elementos de `nCells` dejo de buscar mas particulas.
+
+    4. Si todavia no llegue a ver todos los elementos de `nCells`, agrego todas las particulas que estaban marcas dentro del radio.
+
+4. Termina devolviendo el vector con el indice de las particulas ordenadas de menor a mayor distancia.
