@@ -125,6 +125,7 @@ Basicamente se encarga de construir una estructura donde divide el espacio en ce
  vector<vector<unsigned int>> near_part = ChainMesh_tracers.N_nearest_objects_cat(N_near_obj);
 ```
 
+falta...
 
 # CatalogueChainMesh.cpp
 
@@ -207,7 +208,7 @@ while(cellsize > start_cellsize) {
 
 Y luego se guarda como atributo de la clase el `nCells` y `cellsize` nuevo.
 
-4. Se calcula un index para cada celda. Y guarda en el vector `cells` la respectiva celda.
+4. Se calcula un index para cada celda. Y guarda en el vector `cells` la respectiva particula.
 
 ```c++
   for (unsigned int i=0; i<data[0].size(); i++) {
