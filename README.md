@@ -1,6 +1,6 @@
 # Notas sobre el codigo de CosmoBologna
 
-Aca voy a ir escribiendo todas las notas sobre el codigo de la libreria CosmoBologna
+Aca voy a ir escribiendo todas las notas sobre el codigo de la libreria CosmoBologna. El numero al inicio de cada parrafo hace referencia a la linea de la cual se esta hablando.
 
 # VoidCatalogue.cpp
 
@@ -46,7 +46,7 @@ despues inicia la reconstrucción que depende del valor de `algorithm`.
 
 ##  Es  `algorithm==VoidAlgorithm::_LaZeVo_`
 
-1. Observa si el `random_catalogue` es vacio, si es asi, genera un nuevo catalogo random uniforme mediante `Catalogue` (linea 81) donde se le pasa como parametro `create_Random_box`. Esta definido en el archivo RandomCatalogue.cpp de la linea 88 a la 118.
+1. (80-83) Observa si el `random_catalogue` es vacio, si es asi, genera un nuevo catalogo random uniforme mediante `Catalogue` (linea 81) donde se le pasa como parametro `create_Random_box`. Esta definido en el archivo RandomCatalogue.cpp de la linea 88 a la 118.
 
 Linea 81
 ```c++
@@ -82,19 +82,20 @@ Catalogue(
 * `z_ndigits`:cantidad de dígitos usados para discretizar/redondear redshift
 * `seed`:semilla del generador de números aleatorios
 
+2. (84) Si tienen la misma cantidad no hace nada.
 
-2. Si `random_catalogue` tiene distinta cantidad de objetos que `tracer_catalogue` le saca o elimina objetos a `random_catalogue`(linea 96). El metodo que se encarga de esto esta definido en RandomCatalogue.cpp de la linea 694 a la 725.
+1. (88-97) Si `random_catalogue` tiene distinta cantidad de objetos que `tracer_catalogue` le saca o elimina objetos a `random_catalogue`(linea 96). El metodo que se encarga de esto esta definido en RandomCatalogue.cpp de la linea 694 a la 725.
 
 Linea 96
 ```c++
 random_catalogue.equalize_random_box(tracer_catalogue, rndd);
 ```
 
-3. Si tienen la misma cantidad no hace nada.
+4. (99-100) Hace dos punteros, uno a el catalogo de random y al de tracer. Define un vector que guardara las indexacion a tracer, y lo llena con valores consecutivos ordenados desde 0 (linea 104).
 
-4. Hace dos punteros, uno a el catalogo de random y al de tracer. Define un vector que guardara las indexacion a tracer, y lo llena con valores consecutivos ordenados desde 0 (linea 104).
+### ChainMesh setting
 
-5. Define 2 ChainMesh, una para el catalogo de random y para el de tracer.
+5. (106-110) Define 2 ChainMesh, una para el catalogo de random y para el de tracer.
 
 Linea 107
 ```c++
@@ -119,13 +120,112 @@ ChainMesh esta definido en CatalogueChainMesh.cpp desdey este toma 4 parametros.
 
 Basicamente se encarga de construir una estructura donde divide el espacio en celdas y guarda los puntos que estan en ese espacio. En esta estructura tambien se guardan las celdas vecinas a cada celda.
 
-6. Declaro un vector de vectores que va a guardar por cada particula las 113 particulas mas cercanas a cada una.
+### Searching close particles
 
+6. (114) Declaro un vector de vectores que va a guardar por cada particula las `N_near_obj` (113) particulas mas cercanas a cada una.
+
+Linea 114
 ```c++
  vector<vector<unsigned int>> near_part = ChainMesh_tracers.N_nearest_objects_cat(N_near_obj);
 ```
 
-falta...
+7. (116-120) Completo el vector de vectores `random` con numeros de 0 hasta la cantidad de particulas que tiene el catalgo tracer ordenados de formla aleatoria.
+
+### Setting starting configuration
+
+8. (125-128) Calcula los limites del box en todas las dimensiones y define a `dist` como la media de distancia entre particulas en tracer por 4.
+
+9. (130-162) Comienza a generar `n_rec` de veces el primer macheo entre tracer con random. Define el rango de los numeros aleatorios para cada dimension, osea que el numero aleatorio para la poscion en x es desde `minX` hasta `maxX`.
+
+(137) Crea una copia de las chain mesh de tracer y catalogo.
+
+(141-142) Ahora va agenerar tantos macheos como cantidad de particulas tenga el catalogo de tracer. Empieza eligiendo una posicion `pos` aleatoria en plano. Desde la copia de la chain mesh de tracer tomo todas las particulas cercanas a `pos` a una distancia a lo sumo de `dist` y lo guarda en `close`.
+
+(143) Toma el minimo entre 100 y la cantidad de particulas en `colse` y lo guarda en `tr_to_rmv`.
+
+(144-145) Si tengo particulas en `close` empiezo tomando desde la copia de chain mesh random la misma cantidad de particulas cercanas a `pos` que tengo en `close` y lo guarda en `close_random`.
+
+(150-158) Elige una particula aleatoria i de `close` y otra j de `close_random` y termina guardando de tal forma que queda en cada posicion de `randoms` es equivalente a una particula en tracer y lo que guarda ahi se refiere a una particula de random.
+
+```c++
+randoms[rec][i] = j
+```
+
+Despues de esta asignacion va eliminando las particulas utilizadas de su correspondiente copias de chain mesh, asi no se repiten las mismas particulas posteriormente y repite el macheo `tr_to_rmv` cantidad de veces y luego vuelve a la linea 141.
+
+Linea 150-158
+```c++
+while (tr_to_rmv > 0) {
+            std::uniform_int_distribution<std::mt19937::result_type> dist(0, tr_to_rmv-1);
+            int rnd1 = dist(rng), rnd2 = dist(rng);
+            randoms[rec][close[rnd1]] = close_random[rnd2];
+            ChM_tracer_copy.deletePart(close[rnd1]);
+            ChM_random_copy.deletePart(close_random[rnd2]);
+            close.erase(close.begin()+rnd1);
+            close_random.erase(close_random.begin()+rnd2);
+            tr_to_rmv--;
+          }
+```
+
+### Performing the iterations
+
+10. (168–267) Para cada reconstrucción, el algoritmo intenta establecer una correspondencia (matching) entre las partículas del catálogo aleatorio (random) y las partículas trazadoras (tracers). Este proceso se realiza iterativamente, intercambiando asociaciones entre partículas con el objetivo de minimizar la distancia total entre los pares emparejados. Las iteraciones continúan hasta que la variación media producida por estos intercambios es menor o igual que el umbral especificado, indicando que se ha alcanzado una configuración suficientemente estable y cercana al mínimo de distancia global.
+
+(173) Entra al while donde va a repetir este remacheo hasta cumplir con el humbral
+
+(176-180) Mezcla un vector que tiene numeros desde el 0 a el numero de particulas en el catalogo tracer. Define una funcion uniforme que toma numeros aleatorios desde 1 hasta `N_near_obj`-1. Y define dos vectores de booleanos en cual `index_bool` guardara si se realizo alguma permutacion en el macheo y `used` se utilizara para marcar las particulas que se esten utilizando asi cuando se paralelice no ocurran condiciones de carrera y dos hilos distintos tomen una misma particula.
+
+(182-230) Se paraleliza el codigo de tal forma que se divide el siguiente for en la cantidad de hilos que tenga el procesador. Osea si tenemos 4 hilos y `num_objects` = 100 tendremos 4 ciclos en paralelo donde uno va de la particula 0 a la 24, otro de la 25 a la 49, otro de la 50 a la 74 y otro de la 75 a la 99.
+
+(185) El ciclo for pasa por todas las `i` particulas del catalogo tracer.
+
+(187-191) Tomo 3 posiciones aleatorios entre 1 y `N_near_obj`-1. Si alguno es igual a otro los cambio hasta tener 3 distintos.
+
+(192) Chequeo si alguna de las particulas cercanas a `i` que se encuentran en las posiciones aleatorias y en 0 se esta utilizando.
+
+```c++
+if (used[near_part[index_tracer_cat_copy[i]][0]] == false &&
+    used[near_part[index_tracer_cat_copy[i]][rand1]] == false &&
+    used[near_part[index_tracer_cat_copy[i]][rand2]] == false &&
+    used[near_part[index_tracer_cat_copy[i]][rand3]] == false)
+```
+
+(194-205) Si no es asi, las marco. Las guardo y tambien guardo a la particula que tiene cada una macheada en random.
+
+(210-219) Ahora va a calcular la distancia que hay entre cada macheo y luego va comparar esta distancia con la distancia que habria permutando los macheos. Ejemplo si tengo las particulas 1, 2 y 3 de tracer y las particulas a, b y c de random calculo la distancia que hay entre 1 con a, 2 con b y 3 con c, luego veo la distancia de 1 con b, 2 con c y 3 con a y asi consecutivamente hasta encontrar la menor distancia.
+
+```c++
+do {
+              dist = 0.;
+              for (size_t j=0; j<R.size(); j++)
+                dist += cbl::Euclidean_distance(tracer_cat->xx(H[j]), random_cat->xx(R[j]), tracer_cat->yy(H[j]), random_cat->yy(R[j]), tracer_cat->zz(H[j]), random_cat->zz(R[j]));
+
+                if (dist < dist_min) {
+                dist_min = dist;
+                R_def = R;
+              }
+            } while(std::next_permutation(R.begin(), R.end()));
+```
+
+Si el macheo es distinto al original lo guardo en `index_bool` y actualizo el macheo que habia entre particulas de tracer y de random en el vector `randoms`. Por ultimo desmarco las particulas que estoy usando.
+
+(232-237) Se calcula el ratio de cambios en el macheo e imprime toda la informacion.
+
+(241-248) Crea un vector de objetos en cual va a guardar el vector de desplasamiento de cada particula del catalogo de tracer. Y lo termina guardando en el vector de catalogos `displacement_catalogue` el cual para cada reconstruccion va a tener su catalogo de vectores de desplazamiento.
+
+El output de este primer paso es `displacement_catalogue`.
+
+### End of LaZeVo method
+
+## Es `algorithm==VoidAlgorithm::_Exact_`
+
+...
+
+## Segunda etapa
+
+...
+
+
 
 # CatalogueChainMesh.cpp
 
@@ -278,7 +378,7 @@ vector<vector<unsigned int>> nCells = nearCells(center_index);
       }
       ```
 
-    3. Si llego a ver todos los elementos de `nCells` dejo de buscar mas particulas.
+    3. Si llego a ver todos los elementos de `nCells` dejo de buscar mas particulas..
 
     4. Si todavia no llegue a ver todos los elementos de `nCells`, agrego todas las particulas que estaban marcas dentro del radio.
 
