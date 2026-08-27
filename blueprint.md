@@ -130,7 +130,8 @@ do {    //210
 } while(std::next_permutation(R.begin(), R.end())); //219
 ```
 
-    Guardando la permutacion con la menor distancia T_max.
+    Guardando la permutacion con la menor distancia T_max. Y libera a los
+    trazadores utilizados.
 
 ```c++
 if(R_def != R_copy) index_bool[i] = true;
